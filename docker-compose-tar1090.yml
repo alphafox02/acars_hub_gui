@@ -8,7 +8,6 @@ services:
     - LAT=33.533746
     - LONG=-82.130675
     - 'TAR1090_CONFIGJS_APPEND=droneJson="./data/drone.json";'
-    - 'TAR1090_CONFIGJS_APPEND=djiJson="./data/dji.json";'
     - ULTRAFEEDER_CONFIG=
       adsb,airspy_adsb,30005,beast_in;
     - READSB_EXTRA_ARGS=--net-beast-reduce-interval 2 --net-sbs-reduce --net-connector=dump978,30978,uat_in,silent_fail
