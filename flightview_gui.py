@@ -7,6 +7,21 @@ import os
 import sys
 import time
 
+# ---------------------------
+# 1) SingleQuoted class + representer
+# ---------------------------
+class SingleQuoted(str):
+    """A subclass of str to enforce single-quote style in YAML output."""
+    pass
+
+def single_quoted_str_representer(dumper, data):
+    """Represent SingleQuoted strings with single quotes in YAML."""
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data, style="'")
+
+# Register our custom representer with PyYAML
+yaml.add_representer(SingleQuoted, single_quoted_str_representer)
+# ---------------------------
+
 # Function to check for sudo privileges
 def check_sudo():
     if os.geteuid() != 0:
@@ -60,13 +75,36 @@ def apply_temporary_changes(file_path, new_lat, new_lon, new_tz):
 
     for service in config['services']:
         env = config['services'][service].get('environment', [])
-        for i in range(len(env)):
-            if env[i].startswith('LAT='):
-                env[i] = f'LAT={new_lat}'
-            elif env[i].startswith('LONG='):
-                env[i] = f'LONG={new_lon}'
-            elif env[i].startswith('TZ='):
-                env[i] = f'TZ={new_tz}'
+
+        # If it's a list of KEY=VAL strings, update them
+        if isinstance(env, list):
+            for i in range(len(env)):
+                if env[i].startswith('LAT='):
+                    env[i] = f'LAT={new_lat}'
+                elif env[i].startswith('LONG='):
+                    env[i] = f'LONG={new_lon}'
+                elif env[i].startswith('TZ='):
+                    env[i] = f'TZ={new_tz}'
+                elif env[i].startswith('TAR1090_CONFIGJS_APPEND='):
+                    # Force single quotes just for TAR1090_CONFIGJS_APPEND
+                    env[i] = SingleQuoted(
+                        'TAR1090_CONFIGJS_APPEND=droneJson= ["./data/drone.json", "./data/dji_drone.json"];'
+                    )
+
+        # If it's a dictionary (in case you switch environment format), do similar
+        elif isinstance(env, dict):
+            if 'LAT' in env:
+                env['LAT'] = new_lat
+            if 'LONG' in env:
+                env['LONG'] = new_lon
+            if 'TZ' in env:
+                env['TZ'] = new_tz
+            if 'TAR1090_CONFIGJS_APPEND' in env:
+                env['TAR1090_CONFIGJS_APPEND'] = SingleQuoted(
+                    'droneJson= ["./data/drone.json", "./data/dji_drone.json"];'
+                )
+
+        config['services'][service]['environment'] = env
 
     with open(file_path, 'w') as file:
         yaml.dump(config, file)
@@ -136,8 +174,16 @@ notebook.add(tab1, text="Service 1 (airspy_adsb)")
 notebook.add(tab2, text="Service 2 (tar1090)")
 
 # Create and configure widgets for Service 1 (airspy_adsb)
-start_button_1 = tk.Button(tab1, text="Start airspy_adsb Service", command=lambda: start_airspy_service("docker-compose-airspy-adsb.yml", running_label_1))
-stop_button_1 = tk.Button(tab1, text="Stop airspy_adsb Service", command=lambda: stop_airspy_service("docker-compose-airspy-adsb.yml", running_label_1))
+start_button_1 = tk.Button(
+    tab1, 
+    text="Start airspy_adsb Service", 
+    command=lambda: start_airspy_service("docker-compose-airspy-adsb.yml", running_label_1)
+)
+stop_button_1 = tk.Button(
+    tab1, 
+    text="Stop airspy_adsb Service", 
+    command=lambda: stop_airspy_service("docker-compose-airspy-adsb.yml", running_label_1)
+)
 running_label_1 = tk.Label(tab1, text="Not Running", foreground="red")
 
 # Load and display the current configuration values for Service 1 (airspy_adsb)
@@ -150,9 +196,21 @@ stop_button_1.grid(row=0, column=1, padx=10, pady=10)
 running_label_1.grid(row=1, column=0, columnspan=2, padx=10, pady=10)
 
 # Create and configure widgets for Service 2 (tar1090)
-start_button_2 = tk.Button(tab2, text="Start tar1090 Service", command=lambda: start_service("docker-compose-tar1090.yml", lat_entry, lon_entry, tz_entry, running_label_2))
-stop_button_2 = tk.Button(tab2, text="Stop tar1090 Service", command=lambda: stop_service("docker-compose-tar1090.yml", running_label_2))
-save_button_2 = tk.Button(tab2, text="Save Changes", command=lambda: save_changes("docker-compose-tar1090.yml", lat_entry.get(), lon_entry.get(), tz_entry.get()))
+start_button_2 = tk.Button(
+    tab2, 
+    text="Start tar1090 Service", 
+    command=lambda: start_service("docker-compose-tar1090.yml", lat_entry, lon_entry, tz_entry, running_label_2)
+)
+stop_button_2 = tk.Button(
+    tab2, 
+    text="Stop tar1090 Service", 
+    command=lambda: stop_service("docker-compose-tar1090.yml", running_label_2)
+)
+save_button_2 = tk.Button(
+    tab2, 
+    text="Save Changes", 
+    command=lambda: save_changes("docker-compose-tar1090.yml", lat_entry.get(), lon_entry.get(), tz_entry.get())
+)
 lat_label_2 = tk.Label(tab2, text="Latitude:")
 lon_label_2 = tk.Label(tab2, text="Longitude:")
 tz_label_2 = tk.Label(tab2, text="Timezone:")
